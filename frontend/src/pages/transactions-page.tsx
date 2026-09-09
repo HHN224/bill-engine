@@ -1,4 +1,4 @@
-import { ReceiptText } from "lucide-react";
+import { Download, ReceiptText } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -28,6 +28,10 @@ import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useToast } from "@/components/ui/toaster";
 import { KEYWORD_DEBOUNCE_MS, PAGE_SIZE } from "@/lib/constants";
 import { formatLocalDateTime } from "@/lib/datetime";
+import {
+  downloadTransactionsCsv,
+  fetchAllTransactions,
+} from "@/lib/transaction-export";
 import {
   DEFAULT_FILTERS,
   filtersFromSearchParams,
@@ -94,6 +98,28 @@ export function TransactionsPage() {
   const deleteMutation = useDeleteTransaction();
   const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  async function handleExportAll() {
+    setIsExporting(true);
+    try {
+      const transactions = await fetchAllTransactions();
+      downloadTransactionsCsv(transactions);
+      toast({
+        variant: "success",
+        title: "导出成功",
+        description: `共导出 ${transactions.length} 条账单记录。`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "导出失败",
+        description: describeError(error),
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   function handleDeleteConfirm() {
     if (!deleteTarget) {
@@ -140,12 +166,23 @@ export function TransactionsPage() {
         title="交易"
         description="筛选条件与页码会同步到地址栏，刷新后视图保持一致。"
         actions={
-          <Link
-            to="/transactions/new"
-            className={buttonVariants({ size: "sm" })}
-          >
-            新增交易
-          </Link>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isExporting}
+              onClick={() => void handleExportAll()}
+            >
+              <Download aria-hidden />
+              {isExporting ? "正在导出…" : "导出全部账单记录"}
+            </Button>
+            <Link
+              to="/transactions/new"
+              className={buttonVariants({ size: "sm" })}
+            >
+              新增交易
+            </Link>
+          </div>
         }
       />
 
