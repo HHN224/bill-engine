@@ -7,14 +7,18 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict
 
 
+DEFAULT_LLM_BASE_URL = "https://api.deepseek.com"
+DEFAULT_LLM_MODEL = "deepseek-flash"
+
+
 class Settings(BaseModel):
     """记账服务的运行时配置。"""
 
     model_config = ConfigDict(frozen=True)
 
     llm_api_key: str = ""
-    llm_base_url: str = ""
-    llm_model: str = ""
+    llm_base_url: str = DEFAULT_LLM_BASE_URL
+    llm_model: str = DEFAULT_LLM_MODEL
     llm_timeout_seconds: float = 8.0
     app_api_token: str = ""
     admin_api_token: str = ""
@@ -27,8 +31,8 @@ class Settings(BaseModel):
         load_dotenv()
         return cls(
             llm_api_key=os.getenv("LLM_API_KEY", ""),
-            llm_base_url=os.getenv("LLM_BASE_URL", ""),
-            llm_model=os.getenv("LLM_MODEL", ""),
+            llm_base_url=os.getenv("LLM_BASE_URL", DEFAULT_LLM_BASE_URL),
+            llm_model=os.getenv("LLM_MODEL", DEFAULT_LLM_MODEL),
             llm_timeout_seconds=float(
                 os.getenv("LLM_TIMEOUT_SECONDS", "8")
             ),

@@ -77,8 +77,8 @@ DEFAULT_TIMEZONE=Asia/Taipei
 DATABASE_URL=sqlite:///./data/bookkeeping.db
 
 LLM_API_KEY=your-api-key
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_MODEL=your-model-name
+LLM_BASE_URL=https://api.deepseek.com
+LLM_MODEL=deepseek-flash
 LLM_TIMEOUT_SECONDS=8
 ```
 

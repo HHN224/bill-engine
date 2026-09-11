@@ -5,11 +5,10 @@ from typing import Any
 
 import httpx
 
-from app.config import Settings, get_settings
+from app.config import DEFAULT_LLM_BASE_URL, Settings, get_settings
 from app.logging_config import get_application_logger
 
 
-DEFAULT_LLM_BASE_URL = "https://api.openai.com/v1"
 _MAX_LOGGED_RESPONSE_CHARS = 500
 logger = get_application_logger(__name__)
 
