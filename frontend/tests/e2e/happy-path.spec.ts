@@ -17,10 +17,10 @@ test.beforeEach(async ({ page }) => {
 
 test("错误的凭证无法进入后台", async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/);
-  await page.getByLabel("后台凭证").fill("definitely-wrong-token");
+  await page.getByLabel("后台密码").fill("definitely-wrong-token");
   await page.getByRole("button", { name: "进入后台" }).click();
   await expect(page.getByRole("alert")).toContainText(
-    "凭证无效，请核对后重新输入。",
+    "密码错误，请核对后重新输入。",
   );
   await expect(page).toHaveURL(/\/login$/);
 });
@@ -34,7 +34,7 @@ test("登录 → 新增 → 列表可见 → 编辑 → 删除", async ({ page }
 
   // 1. 登录：未持有凭证时受保护页面会跳转到登录页。
   await expect(page).toHaveURL(/\/login$/);
-  await page.getByLabel("后台凭证").fill(adminToken!);
+  await page.getByLabel("后台密码").fill(adminToken!);
   await page.getByRole("button", { name: "进入后台" }).click();
 
   // 2. 总览页加载成功。

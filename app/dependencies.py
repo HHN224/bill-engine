@@ -48,8 +48,8 @@ def verify_admin_token(
     ],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> None:
-    """要求 Bearer Token 与后台管理专用 ADMIN_API_TOKEN 一致。"""
-    _verify_bearer_token(credentials, settings.admin_api_token)
+    """要求 Bearer Token 与后台管理专用 ADMIN_PASSWORD 一致。"""
+    _verify_bearer_token(credentials, settings.admin_password)
 
 
 def verify_app_or_admin_token(
@@ -58,14 +58,14 @@ def verify_app_or_admin_token(
     ],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> None:
-    """允许 APP_API_TOKEN 或 ADMIN_API_TOKEN 访问共享接口。"""
+    """允许 APP_API_TOKEN 或 ADMIN_PASSWORD 访问共享接口。"""
     supplied_token = credentials.credentials if credentials else ""
     token_is_valid = any(
         bool(expected_token)
         and secrets.compare_digest(supplied_token, expected_token)
         for expected_token in (
             settings.app_api_token,
-            settings.admin_api_token,
+            settings.admin_password,
         )
     )
     if not token_is_valid:

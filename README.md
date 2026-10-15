@@ -47,7 +47,7 @@ python -m venv .venv
 Copy-Item .env.example .env
 ```
 
-编辑 `.env`：将 `APP_API_TOKEN` 和 `ADMIN_API_TOKEN` 替换为两枚不同的长随机值。需要自然语言记账时，再填写 `LLM_API_KEY`、`LLM_BASE_URL` 和 `LLM_MODEL`；仅体验管理后台和手工记账可以不配置模型密钥。
+编辑 `.env`：设置手机快捷指令的 `APP_API_TOKEN`；后台密码使用 `ADMIN_PASSWORD`，默认 `12356`。需要自然语言记账时，再填写 `LLM_API_KEY`、`LLM_BASE_URL` 和 `LLM_MODEL`；仅体验管理后台和手工记账可以不配置模型密钥。
 
 初始化数据库并启动 API：
 
@@ -66,7 +66,7 @@ npm.cmd ci
 npm.cmd run dev
 ```
 
-打开 [管理后台](http://127.0.0.1:5173)，输入 `.env` 中的 `ADMIN_API_TOKEN`。新建数据库初始为空，添加账单后即可查看统计图。
+打开 [管理后台](http://127.0.0.1:5173)，输入后台密码（默认 `12356`，可通过 `.env` 中的 `ADMIN_PASSWORD` 修改）。新建数据库初始为空，添加账单后即可查看统计图。
 
 <details>
 <summary>macOS / Linux 安装与启动</summary>
@@ -78,7 +78,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 cp .env.example .env
-# 编辑 .env，设置两枚不同的随机 Token。
+# 编辑 .env，设置 APP_API_TOKEN 和后台密码 ADMIN_PASSWORD（默认 12356）。
 python -m alembic upgrade head
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
@@ -105,7 +105,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```mermaid
 flowchart LR
     Shortcut["iPhone 快捷指令"] -->|"APP Token · 自然语言"| API["FastAPI"]
-    Web["React 管理后台"] -->|"ADMIN Token · 管理与统计"| API
+    Web["React 管理后台"] -->|"后台密码 · 管理与统计"| API
     API -->|"解析文本"| Model["Chat Completions 模型服务"]
     API -->|"账单与聚合查询"| DB[("SQLite")]
 ```
@@ -117,7 +117,7 @@ flowchart LR
 | 持久化 | SQLAlchemy、SQLite 与 Alembic，保存账单并管理表结构迁移 |
 | 入口与部署 | Bearer Token 分离权限；Caddy 托管前端并代理 API，Docker Compose 编排服务 |
 
-当前为单用户系统。手机 Token 可解析记账与读取今日汇总；后台 Token 可管理账单和查看统计，两者不能互换。后台凭证只保存在页面内存中，刷新后需要重新输入。
+当前为单用户系统。手机 Token 可解析记账与读取今日汇总；后台密码可管理账单和查看统计，两者不能互换。后台凭证只保存在页面内存中，刷新后需要重新输入。
 
 ## 部署
 
@@ -175,7 +175,7 @@ npm.cmd run typecheck
 npm.cmd run build
 ```
 
-端到端测试需要先启动后端，再设置 `E2E_ADMIN_TOKEN` 为本地管理 Token，运行 `npm.cmd run test:e2e`。
+端到端测试需要先启动后端，再设置 `E2E_ADMIN_TOKEN` 为本地后台密码，运行 `npm.cmd run test:e2e`。
 
 </details>
 

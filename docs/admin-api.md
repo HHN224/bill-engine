@@ -4,7 +4,7 @@
 
 ## 通用规则
 
-- 后台接口统一携带 `Authorization: Bearer <ADMIN_API_TOKEN>`。
+- 后台接口统一携带 `Authorization: Bearer <ADMIN_PASSWORD>`。
 - 请求与响应均使用 JSON，时间使用带时区偏移的 ISO 8601 字符串。
 - 金额在 JSON 中是数字，数据库精度为两位小数。
 - 错误统一返回 `success: false`、`error_code`、`message` 和 `details`。
@@ -92,7 +92,7 @@
 
 `GET /api/summaries/daily`
 
-返回日期、支出总额、收入总额、交易笔数和支出分类汇总。该接口同时接受 `APP_API_TOKEN` 和 `ADMIN_API_TOKEN`。
+返回日期、支出总额、收入总额、交易笔数和支出分类汇总。该接口同时接受 `APP_API_TOKEN` 和 `ADMIN_PASSWORD`。
 
 ### 月度统计
 

@@ -80,7 +80,7 @@ def test_shortcut_request_is_parsed_saved_and_summarized(tmp_path) -> None:
     app.dependency_overrides[get_transaction_parser] = lambda: parser
     app.dependency_overrides[get_settings] = lambda: Settings(
         app_api_token="test-shortcut-token",
-        admin_api_token="test-admin-token",
+        admin_password="test-admin-token",
         default_timezone="Asia/Taipei",
     )
 

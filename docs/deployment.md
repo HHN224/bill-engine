@@ -73,7 +73,7 @@ DATA_HOST_DIR=/var/lib/bookkeeping/data
 BACKUP_HOST_DIR=/var/backups/bookkeeping
 
 APP_API_TOKEN=手机快捷指令专用的高强度随机值
-ADMIN_API_TOKEN=后台管理专用的另一个高强度随机值
+ADMIN_PASSWORD=12356
 DATABASE_URL=sqlite:///./data/bookkeeping.db
 DEFAULT_TIMEZONE=Asia/Hong_Kong
 
@@ -83,7 +83,7 @@ LLM_MODEL=实际使用的模型
 LLM_TIMEOUT_SECONDS=30
 ```
 
-`APP_API_TOKEN` 与 `ADMIN_API_TOKEN` 必须不同：前者只给 iPhone 快捷指令，后者只给后台管理系统。
+`APP_API_TOKEN` 只给 iPhone 快捷指令；`ADMIN_PASSWORD` 是后台登录密码，默认 `12356`。旧的 `ADMIN_API_TOKEN` 不再使用。
 `DATABASE_URL` 应保持指向容器内 `/app/data` 对应的相对路径；宿主机真实路径只放在
 `DATA_HOST_DIR`。不要提交 `.env`，也不要把 Token 或 LLM Key 粘贴进日志和工单。
 
@@ -121,7 +121,7 @@ curl -fsS "https://${DOMAIN}/" | head -n 5
 curl -fsS "https://${DOMAIN}/transactions" | head -n 5
 ```
 
-打开 `https://${DOMAIN}/login`，输入 `.env` 中的 `ADMIN_API_TOKEN` 应能进入总览页。
+打开 `https://${DOMAIN}/login`，输入 `.env` 中的 `ADMIN_PASSWORD` 应能进入总览页。
 
 成功的健康响应为 `{"status":"ok"}`。下面的命令不应显示宿主机端口映射：
 
@@ -163,12 +163,12 @@ curl -fsS "https://${DOMAIN}/health"
 `docker compose down -v`：`-v` 会删除 Caddy 的证书与运行状态卷。也不要删除
 `DATA_HOST_DIR`。
 
-## 6. 轮换 API Token
+## 6. 修改手机 Token 或后台密码
 
-两枚 Token 应分别轮换，且始终保持不同：
+手机 Token 和后台密码可以分别修改：
 
-1. 在密码管理器中生成并保存新的高强度随机值。
-2. 修改服务器 `.env` 中对应的 `APP_API_TOKEN` 或 `ADMIN_API_TOKEN`。
+1. 准备新的手机 Token 或后台密码。
+2. 修改服务器 `.env` 中对应的 `APP_API_TOKEN` 或 `ADMIN_PASSWORD`。
 3. 强制重新创建 app：
 
    ```bash
@@ -177,12 +177,12 @@ curl -fsS "https://${DOMAIN}/health"
 
 4. 用旧 Token 请求其原权限接口，应返回 401；用新 Token 请求应成功。
 5. 轮换 `APP_API_TOKEN` 时，更新 iPhone 快捷指令并执行一次真实记账请求。
-6. 轮换 `ADMIN_API_TOKEN` 时，更新后台的安全配置并验证列表、手工新增和统计；不得把新值写进前端源码或 `localStorage`。
+6. 轮换 `ADMIN_PASSWORD` 时，更新后台的安全配置并验证列表、手工新增和统计；不得把新值写进前端源码或 `localStorage`。
 7. 从密码管理器和安全变量中撤销旧 Token。
 
 只运行 `docker compose restart app` 不会重新读取 `.env`；环境变量变更必须使用
-`docker compose up -d --force-recreate app`。从单 Token 版本升级时，先新增与手机 Token 不同的
-`ADMIN_API_TOKEN`，否则全部后台接口会返回 401。
+`docker compose up -d --force-recreate app`。升级后后台使用 `ADMIN_PASSWORD`，未配置时默认 `12356`。
+原来的 `ADMIN_API_TOKEN` 不再生效；无需修改数据库或手机 Token。
 
 ## 7. 每日 SQLite 备份与保留策略
 
@@ -250,7 +250,7 @@ curl -fsS "https://${DOMAIN}/health"
 - app 容器进程 UID 为 10001，健康状态为 `healthy`。
 - 宿主机没有 app 的 8000 映射；HTTP 跳转 HTTPS，正式证书有效。
 - 前端 `index.html` 与静态资源正常返回，刷新 `/transactions` 等前端路由不 404。
-- `/api/transactions` 未带 Token 返回 401；浏览器中使用 `ADMIN_API_TOKEN` 能完成登录、新增、编辑、删除与统计查看。
+- `/api/transactions` 未带 Token 返回 401；浏览器中使用 `ADMIN_PASSWORD` 能完成登录、新增、编辑、删除与统计查看。
 - 空数据目录首次启动可创建数据库，重新创建容器后数据仍存在。
 - 两枚 Token 不能互换；各自的旧值返回 401，新值能访问对应权限接口。
 - 日志包含错误上下文但不包含密钥、完整 Authorization 或完整模型响应。

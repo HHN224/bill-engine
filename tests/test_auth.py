@@ -13,7 +13,7 @@ def create_test_app() -> FastAPI:
     test_app = FastAPI()
     test_app.dependency_overrides[get_settings] = lambda: Settings(
         app_api_token="shortcut-token",
-        admin_api_token="admin-token",
+        admin_password="admin-token",
     )
 
     @test_app.get(
@@ -96,3 +96,19 @@ def test_missing_token_returns_401() -> None:
         response = client.get("/shortcut")
 
     assert response.status_code == 401
+
+
+def test_default_password_replaces_old_admin_token(monkeypatch) -> None:
+    monkeypatch.setenv("ADMIN_API_TOKEN", "old-admin-token")
+    monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
+    monkeypatch.setattr("app.config.load_dotenv", lambda: None)
+    test_app = create_test_app()
+    test_app.dependency_overrides[get_settings] = Settings.from_environment
+
+    with TestClient(test_app) as client:
+        assert client.get(
+            "/admin", headers={"Authorization": "Bearer 12356"}
+        ).status_code == 200
+        assert client.get(
+            "/admin", headers={"Authorization": "Bearer old-admin-token"}
+        ).status_code == 401

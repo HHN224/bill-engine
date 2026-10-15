@@ -191,7 +191,7 @@ def test_deployment_runbook_covers_required_operations() -> None:
         "DATA_HOST_DIR",
         "BACKUP_HOST_DIR",
         "APP_API_TOKEN",
-        "ADMIN_API_TOKEN",
+        "ADMIN_PASSWORD",
         "python -m alembic upgrade head",
         "A/AAAA",
         "80/443",

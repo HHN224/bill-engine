@@ -10,4 +10,4 @@ def test_settings_defaults() -> None:
     assert settings.llm_model == "deepseek-flash"
     assert settings.llm_timeout_seconds == 8.0
     assert settings.app_api_token == ""
-    assert settings.admin_api_token == ""
+    assert settings.admin_password == "12356"

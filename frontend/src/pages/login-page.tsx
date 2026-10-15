@@ -10,9 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 type VerifyState = "idle" | "verifying" | "failed";
 
 /**
- * 后台凭证输入页。这是单用户系统的静态凭证校验，
- * 不是多用户账号登录，页面文案保持这一语义。
- * Token 只写入内存，刷新页面后需要重新输入。
+ * 单用户后台密码登录；密码只保存在内存，刷新后需要重新输入。
  */
 export function LoginPage() {
   const { login } = useAuth();
@@ -40,7 +38,7 @@ export function LoginPage() {
     } catch (error) {
       setState("failed");
       if (error instanceof ApiError && error.isUnauthorized) {
-        setErrorMessage("凭证无效，请核对后重新输入。");
+        setErrorMessage("密码错误，请核对后重新输入。");
       } else if (error instanceof NetworkError) {
         setErrorMessage(error.message);
       } else if (error instanceof ApiError) {
@@ -65,17 +63,17 @@ export function LoginPage() {
             Pocket Ledger 后台
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            输入后台管理凭证（ADMIN_API_TOKEN）进入。
+            输入后台密码进入。
           </p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="border-border bg-card rounded-lg border-2 p-6 shadow-pop"
+          className="border-border bg-card shadow-pop rounded-lg border-2 p-6"
           noValidate
         >
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="admin-token">后台凭证</Label>
+            <Label htmlFor="admin-token">后台密码</Label>
             <Input
               id="admin-token"
               type="password"
@@ -87,7 +85,7 @@ export function LoginPage() {
                   setErrorMessage(null);
                 }
               }}
-              placeholder="粘贴 ADMIN_API_TOKEN"
+              placeholder="输入后台密码"
               autoComplete="off"
               autoFocus
               required
@@ -104,7 +102,7 @@ export function LoginPage() {
               </p>
             ) : (
               <p id="login-hint" className="text-muted-foreground text-xs">
-                凭证仅保存在当前页面内存中，刷新后需重新输入。
+                密码仅保存在当前页面内存中，刷新后需重新输入。
               </p>
             )}
           </div>
