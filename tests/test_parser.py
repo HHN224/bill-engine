@@ -17,6 +17,34 @@ from app.services.transaction_parser import (
 CURRENT_TIME = datetime.fromisoformat("2026-07-24T12:30:00+08:00")
 
 
+def test_multiple_transactions_are_parsed_in_order() -> None:
+    llm_client = Mock()
+    llm_client.complete.return_value = json.dumps({
+        "transactions": [
+            json.loads(model_output(amount=23, note="午饭")),
+            json.loads(model_output(amount=30, note="晚饭")),
+            json.loads(model_output(amount=33, category="购物", note="笔记本")),
+        ]
+    }, ensure_ascii=False)
+
+    result = TransactionParser(llm_client).parse("午饭23，晚饭30，笔记本33", CURRENT_TIME)
+
+    assert [item.amount for item in result] == [Decimal("23"), Decimal("30"), Decimal("33")]
+    assert [item.note for item in result] == ["午饭", "晚饭", "笔记本"]
+    llm_client.complete.assert_called_once()
+
+
+@pytest.mark.parametrize("items", [[], [{"amount": 23}], [None]])
+def test_invalid_batch_is_rejected(items) -> None:
+    llm_client = Mock()
+    llm_client.complete.return_value = json.dumps({"transactions": items})
+
+    with pytest.raises(InvalidModelOutputError):
+        TransactionParser(llm_client).parse("午饭23", CURRENT_TIME)
+
+    assert llm_client.complete.call_count == 2
+
+
 def model_output(
     *,
     amount: float | None,
@@ -114,9 +142,9 @@ def test_common_bookkeeping_sentences(
 
     result = TransactionParser(llm_client).parse(text, CURRENT_TIME)
 
-    assert result.amount == expected_amount
-    assert result.type == expected_type
-    assert result.category == expected_category
+    assert result[0].amount == expected_amount
+    assert result[0].type == expected_type
+    assert result[0].category == expected_category
     llm_client.complete.assert_called_once()
 
 
@@ -127,8 +155,8 @@ def test_markdown_json_block_is_cleaned() -> None:
 
     result = TransactionParser(llm_client).parse("午饭18块5", CURRENT_TIME)
 
-    assert isinstance(result, ParsedTransaction)
-    assert result.amount == Decimal("18.5")
+    assert isinstance(result[0], ParsedTransaction)
+    assert result[0].amount == Decimal("18.5")
     assert clean_json_text(output).startswith("{")
 
 
@@ -145,7 +173,7 @@ def test_invalid_json_retries_once_then_succeeds(
 
     result = TransactionParser(llm_client).parse("午饭20", CURRENT_TIME)
 
-    assert result.amount == Decimal("20")
+    assert result[0].amount == Decimal("20")
     assert llm_client.complete.call_count == 2
     retry_prompt = llm_client.complete.call_args_list[1].args[1]
     assert "上一次输出不是符合要求的 JSON" in retry_prompt
@@ -186,7 +214,7 @@ def test_missing_amount_is_preserved_for_later_confirmation() -> None:
 
     result = TransactionParser(llm_client).parse("中午吃了饭", CURRENT_TIME)
 
-    assert result.amount is None
+    assert result[0].amount is None
 
 
 def test_unknown_category_is_rejected() -> None:

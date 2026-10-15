@@ -147,49 +147,47 @@ def parse_and_create_transaction(
             message=str(exc),
         ) from exc
 
-    if parsed.amount is None:
+    if any(item.amount is None for item in parsed):
         return ParseAndCreateResponse(
             success=False,
             requires_confirmation=True,
-            message="没有识别到有效金额，请补充金额。",
-            parsed_data=parsed,
+            message=(
+                "没有识别到有效金额，请补充金额。"
+                if len(parsed) == 1
+                else "部分账单缺少金额，本次全部未保存，请补充后重新提交。"
+            ),
+            parsed_data=parsed[0] if len(parsed) == 1 else None,
+            parsed_items=parsed,
         )
 
-    transaction = Transaction(
-        type=parsed.type,
-        amount=parsed.amount,
-        currency=parsed.currency,
-        category=parsed.category,
-        subcategory=parsed.subcategory,
-        merchant=parsed.merchant,
-        payment_method=parsed.payment_method,
-        occurred_at=parsed.occurred_at,
-        note=parsed.note,
-        tags=parsed.tags,
-        raw_text=request.text,
-        confidence=parsed.confidence,
-    )
-    session.add(transaction)
+    transactions = [
+        Transaction(**item.model_dump(), raw_text=request.text)
+        for item in parsed
+    ]
     try:
+        session.add_all(transactions)
         session.commit()
-        session.refresh(transaction)
+        for transaction in transactions:
+            session.refresh(transaction)
     except SQLAlchemyError as exc:
         raise _database_error(session, exc) from exc
 
-    description = (
-        parsed.note
-        or parsed.subcategory
-        or parsed.merchant
-        or "无备注"
-    )
+    descriptions = [
+        f"{item.category} {item.amount:.2f} 元，"
+        f"{item.note or item.subcategory or item.merchant or '无备注'}"
+        for item in parsed
+    ]
+    responses = [_transaction_response(item) for item in transactions]
     return ParseAndCreateResponse(
         success=True,
         requires_confirmation=False,
         message=(
-            f"已记录：{parsed.category} {parsed.amount:.2f} 元，"
-            f"{description}"
+            f"已记录：{descriptions[0]}"
+            if len(parsed) == 1
+            else f"已记录 {len(parsed)} 笔：" + "；".join(descriptions)
         ),
-        transaction=_transaction_response(transaction),
+        transaction=responses[0] if len(responses) == 1 else None,
+        transactions=responses,
     )
 
 

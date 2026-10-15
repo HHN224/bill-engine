@@ -184,6 +184,11 @@ curl -fsS "https://${DOMAIN}/health"
 `docker compose up -d --force-recreate app`。升级后后台使用 `ADMIN_PASSWORD`，未配置时默认 `12356`。
 原来的 `ADMIN_API_TOKEN` 不再生效；无需修改数据库或手机 Token。
 
+本次密码登录与多笔记账升级不改变数据库结构，无需额外迁移。保留原数据目录，更新代码后运行
+`docker compose up -d --build`，同时更新前后端。后台默认密码为 `12356`；手机请求地址和 `APP_API_TOKEN` 不变。
+两个功能分别提交；需要只撤回其中一个功能时，用 `git log --oneline` 找到对应的 `feat` 提交，执行
+`git revert <提交号>` 后重新构建。撤回多笔记账功能不会删除已保存的账单。
+
 ## 7. 每日 SQLite 备份与保留策略
 
 先手动执行一次一致性备份：

@@ -5,7 +5,7 @@ from unittest.mock import Mock
 
 from fastapi.testclient import TestClient
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -93,7 +93,7 @@ def test_parse_and_create_saves_complete_transaction(
     transaction_client,
 ) -> None:
     client, parser, testing_session = transaction_client
-    parser.parse.return_value = parsed_transaction()
+    parser.parse.return_value = [parsed_transaction()]
 
     response = client.post(
         "/api/transactions/parse-and-create",
@@ -214,7 +214,7 @@ def test_missing_amount_requires_confirmation_without_saving(
     transaction_client,
 ) -> None:
     client, parser, testing_session = transaction_client
-    parser.parse.return_value = parsed_transaction(amount=None)
+    parser.parse.return_value = [parsed_transaction(amount=None)]
 
     response = client.post(
         "/api/transactions/parse-and-create",
@@ -273,17 +273,17 @@ def test_list_transactions_supports_order_and_filters(
 ) -> None:
     client, parser, _ = transaction_client
     parser.parse.side_effect = [
-        parsed_transaction(
+        [parsed_transaction(
             amount=Decimal("23"),
             category="交通",
             note="打车",
             occurred_at="2026-07-23T09:00:00+08:00",
-        ),
-        parsed_transaction(
+        )],
+        [parsed_transaction(
             amount=Decimal("18.5"),
             note="牛肉饭",
             occurred_at="2026-07-24T12:20:00+08:00",
-        ),
+        )],
     ]
     for text in ("昨天打车23块", "今天食堂牛肉饭18块5"):
         create_response = client.post(
@@ -333,7 +333,7 @@ def test_get_update_and_delete_transaction(
     transaction_client,
 ) -> None:
     client, parser, _ = transaction_client
-    parser.parse.return_value = parsed_transaction()
+    parser.parse.return_value = [parsed_transaction()]
     created = client.post(
         "/api/transactions/parse-and-create",
         headers=SHORTCUT_HEADERS,
@@ -419,7 +419,7 @@ def test_update_rejects_invalid_amount_and_empty_body(
     transaction_client,
 ) -> None:
     client, parser, _ = transaction_client
-    parser.parse.return_value = parsed_transaction()
+    parser.parse.return_value = [parsed_transaction()]
     transaction_id = client.post(
         "/api/transactions/parse-and-create",
         headers=SHORTCUT_HEADERS,
@@ -452,3 +452,88 @@ def test_update_rejects_invalid_amount_and_empty_body(
     assert empty_update.status_code == 422
     assert invalid_type.status_code == 422
     assert null_type.status_code == 422
+
+
+def test_batch_is_saved_as_separate_rows_and_summarized(transaction_client) -> None:
+    client, parser, testing_session = transaction_client
+    parser.parse.return_value = [
+        parsed_transaction(amount=Decimal("23"), note="午饭"),
+        parsed_transaction(amount=Decimal("30"), note="晚饭"),
+        parsed_transaction(amount=Decimal("33"), category="购物", note="笔记本"),
+    ]
+    response = client.post(
+        "/api/transactions/parse-and-create",
+        headers=SHORTCUT_HEADERS,
+        json={"text": "午饭23，晚饭30，笔记本33"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    assert body["message"].startswith("已记录 3 笔：")
+    assert "transaction" not in body
+    assert [item["amount"] for item in body["transactions"]] == [23, 30, 33]
+    assert len({item["id"] for item in body["transactions"]}) == 3
+    with testing_session() as session:
+        saved = session.scalars(select(Transaction).order_by(Transaction.id)).all()
+        assert [item.note for item in saved] == ["午饭", "晚饭", "笔记本"]
+        assert all(item.raw_text == "午饭23，晚饭30，笔记本33" for item in saved)
+    monthly = client.get(
+        "/api/summaries/monthly?year=2026&month=7", headers=ADMIN_HEADERS,
+    ).json()
+    assert monthly["expense_total"] == 86
+    assert monthly["transaction_count"] == 3
+
+
+def test_batch_with_missing_amount_saves_nothing(transaction_client) -> None:
+    client, parser, testing_session = transaction_client
+    parser.parse.return_value = [
+        parsed_transaction(amount=Decimal("23")),
+        parsed_transaction(amount=None),
+    ]
+    response = client.post(
+        "/api/transactions/parse-and-create",
+        headers=SHORTCUT_HEADERS,
+        json={"text": "午饭23，晚饭忘了多少钱"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is False
+    assert body["requires_confirmation"] is True
+    assert body["transactions"] == []
+    assert len(body["parsed_items"]) == 2
+    with testing_session() as session:
+        assert session.scalar(select(func.count()).select_from(Transaction)) == 0
+
+
+def test_batch_database_failure_rolls_back_all_new_rows(transaction_client) -> None:
+    client, parser, testing_session = transaction_client
+    # 先保存旧账单，再让数据库在写入批次第二笔时失败。
+    parser.parse.return_value = [parsed_transaction(amount=Decimal("10"))]
+    assert client.post(
+        "/api/transactions/parse-and-create", headers=SHORTCUT_HEADERS,
+        json={"text": "旧账单10"},
+    ).status_code == 200
+    with testing_session() as session:
+        session.execute(text("""
+            CREATE TRIGGER fail_second_bill BEFORE INSERT ON transactions
+            WHEN NEW.amount = 30
+            BEGIN SELECT RAISE(ABORT, 'test insert failure'); END
+        """))
+        session.commit()
+    parser.parse.return_value = [
+        parsed_transaction(amount=Decimal("23")),
+        parsed_transaction(amount=Decimal("30")),
+    ]
+    response = client.post(
+        "/api/transactions/parse-and-create", headers=SHORTCUT_HEADERS,
+        json={"text": "午饭23，晚饭30"},
+    )
+
+    assert response.status_code == 500
+    assert response.json()["error_code"] == "DATABASE_ERROR"
+    with testing_session() as session:
+        saved = session.scalars(select(Transaction)).all()
+        assert len(saved) == 1
+        assert saved[0].amount == Decimal("10")

@@ -47,7 +47,11 @@ SYSTEM_PROMPT = f"""
 你是个人记账文本解析器。请把用户输入转换为一个 JSON 对象，只返回 JSON，
 不要返回 Markdown、解释或额外文字。
 
-字段和规则：
+顶层只包含 transactions 数组，每笔独立收支对应一个元素，单笔也放在数组中。
+例如“午饭23，晚饭30，笔记本33”必须拆成三笔，金额分别为23、30、33，不能合并。
+同一笔消费的商家、支付方式等补充描述不要拆成额外账单。
+
+每笔账单的字段和规则：
 1. type 只能是 expense 或 income。默认 expense；工资、生活费到账、退款、
    报销到账等明确入账内容使用 income。
 2. amount 必须来自用户原文，不得编造。无法识别时返回 null。金额必须大于 0。
@@ -60,8 +64,8 @@ SYSTEM_PROMPT = f"""
 7. tags 返回字符串数组，没有标签时返回空数组。
 8. confidence 返回 0 到 1 之间的数字。
 
-必须严格返回以下字段，不要增加字段：
-{{
+必须严格返回以下结构，不要增加字段，transactions 至少包含一笔账单：
+{{"transactions": [{{
   "type": "expense",
   "amount": 18.5,
   "currency": "CNY",
@@ -73,7 +77,7 @@ SYSTEM_PROMPT = f"""
   "note": "牛肉饭",
   "tags": ["食堂", "午餐"],
   "confidence": 0.95
-}}
+}}]}}
 """.strip()
 
 
@@ -114,6 +118,14 @@ class ParsedTransaction(BaseModel):
         return value
 
 
+class ParsedTransactions(BaseModel):
+    """一次输入中解析出的多笔账单，不改变单笔账单结构。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    transactions: list[ParsedTransaction] = Field(min_length=1)
+
+
 class TransactionParserError(Exception):
     """账单解析异常的基类。"""
 
@@ -147,7 +159,7 @@ def _safe_response_snippet(raw_text: str) -> str:
     return f"{normalized[:_MAX_LOGGED_RESPONSE_CHARS]}..."
 
 
-def validate_model_output(raw_text: str) -> ParsedTransaction:
+def validate_model_output(raw_text: str) -> list[ParsedTransaction]:
     """清理、解析并校验模型输出。"""
     cleaned = clean_json_text(raw_text)
     data = json.loads(
@@ -157,7 +169,10 @@ def validate_model_output(raw_text: str) -> ParsedTransaction:
     )
     if not isinstance(data, dict):
         raise ValueError("The LLM output must be a JSON object.")
-    return ParsedTransaction.model_validate(data)
+    # 兼容模型仍然返回旧版单笔对象的情况。
+    if "transactions" not in data:
+        return [ParsedTransaction.model_validate(data)]
+    return ParsedTransactions.model_validate(data).transactions
 
 
 class TransactionParser:
@@ -178,8 +193,8 @@ class TransactionParser:
         text: str,
         current_time: datetime | None = None,
         timezone_name: str | None = None,
-    ) -> ParsedTransaction:
-        """解析一条自然语言账单，非法模型输出最多重试一次。"""
+    ) -> list[ParsedTransaction]:
+        """解析自然语言中的一笔或多笔账单，非法模型输出最多重试一次。"""
         normalized_text = text.strip()
         if not normalized_text:
             raise InvalidParserInputError("Transaction text cannot be empty.")

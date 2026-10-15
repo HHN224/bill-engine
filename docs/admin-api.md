@@ -8,7 +8,7 @@
 - 请求与响应均使用 JSON，时间使用带时区偏移的 ISO 8601 字符串。
 - 金额在 JSON 中是数字，数据库精度为两位小数。
 - 错误统一返回 `success: false`、`error_code`、`message` 和 `details`。
-- `401` 表示后台 Token 缺失或错误；`422` 表示请求数据校验失败。
+- `401` 表示后台密码缺失或错误；`422` 表示请求数据校验失败。
 - 当前后端未开放跨域 CORS。生产后台应与 API 同源部署；本地开发使用前端开发服务器代理 `/api`。
 
 ## 数据类型
@@ -110,3 +110,17 @@
 ## 不属于后台的接口
 
 `POST /api/transactions/parse-and-create` 仅供 iPhone 快捷指令使用，要求 `APP_API_TOKEN`。后台表单不要调用它，也不要持有 `APP_API_TOKEN`。
+
+一次请求可以包含多笔账单，例如：
+
+```json
+{"text": "午饭23，晚饭30，笔记本33", "timezone": "Asia/Hong_Kong"}
+```
+
+模型返回 `{"transactions": [...]}`，数组内每项沿用原来的单笔解析字段。
+三笔账单分别写入现有 `transactions` 表，不新增表或字段，每笔的 `raw_text` 保留整段输入。
+
+- 成功时：`success: true`、`requires_confirmation: false`，`transactions` 包含所有已保存账单；`message` 包含笔数与每笔摘要，可直接用于快捷指令通知。
+- 单笔成功时：同时保留原来的 `transaction` 字段，旧快捷指令仍可读取。
+- 任意一笔缺少金额时：`success: false`、`requires_confirmation: true`，`transactions` 为空，`parsed_items` 返回全部解析结果；整批不保存，补充后重新提交完整文本。单笔缺少金额仍保留 `parsed_data`。
+- 模型结果无效或数据库写入失败时：返回原有错误格式；同一批写入使用一个事务，失败时全部回滚。

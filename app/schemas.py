@@ -80,6 +80,8 @@ class ParseAndCreateResponse(BaseModel):
     message: str
     transaction: TransactionResponse | None = None
     parsed_data: ParsedTransaction | None = None
+    transactions: list[TransactionResponse] = Field(default_factory=list)
+    parsed_items: list[ParsedTransaction] | None = None
 
 
 class ManualTransactionCreate(BaseModel):
